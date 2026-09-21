@@ -1,16 +1,4 @@
 <!DOCTYPE html>
-const SHEET_ID = "1joCg9NZiCzTPAhiIt-LXiT6UVVnTzL19788BVZ1JqA4";
-
-function fetchLiveSheetData() {
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Dashboard`;
-    fetch(csvUrl)
-        .then(res => res.text())
-        .then(csvText => {
-            allSheetTasks = parseCSVToTasks(csvText);
-            groupTasksByWeek();
-            renderDashboard();
-        });
-}
 <html lang="en" class="h-full bg-slate-950">
 <head>
     <meta charset="UTF-8">
@@ -39,7 +27,7 @@ function fetchLiveSheetData() {
             <div>
                 <div class="flex items-center space-x-2">
                     <span class="text-xs font-semibold uppercase tracking-widest text-indigo-400 font-mono">Hybrid Homeschool Command</span>
-                    <span class="bg-indigo-500/10 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/20">CLASSREACH SYNC</span>
+                    <span class="bg-indigo-500/10 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/20">GITHUB PAGES</span>
                 </div>
                 <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                     Weekly Learning Dashboard
@@ -238,8 +226,11 @@ function fetchLiveSheetData() {
         </main>
     </div>
 
-    <!-- DATA ENGINE CONNECTED TO GOOGLE APPS SCRIPT -->
+    <!-- DATA ENGINE CONNECTED DIRECTLY TO GOOGLE SHEETS CSV -->
     <script>
+        const SHEET_ID = "1joCg9NZiCzTPAhiIt-LXiT6UVVnTzL19788BVZ1JqA4";
+        const PARENT_PIN = "08012004";
+
         let allSheetTasks = [];
         let weekGroups = {};
         let activeWeekGroupKey = '';
@@ -250,15 +241,82 @@ function fetchLiveSheetData() {
         let ringChartInstance = null;
 
         function fetchLiveSheetData() {
-            if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run
-                    .withSuccessHandler(function(data) {
-                        allSheetTasks = data || [];
-                        groupTasksByWeek();
-                        renderDashboard();
-                    })
-                    .getHomeschoolData();
+            const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Dashboard`;
+            
+            fetch(csvUrl)
+                .then(response => response.text())
+                .then(csvText => {
+                    allSheetTasks = parseCSVToTasks(csvText);
+                    groupTasksByWeek();
+                    renderDashboard();
+                })
+                .catch(err => {
+                    console.error("Error fetching sheet data:", err);
+                    document.getElementById('calendar-grid-container').innerHTML = 
+                        `<div class="p-12 text-center text-xs text-rose-400">Failed to load data from Google Sheet. Ensure your sheet is shared publicly or to 'Anyone with link'.</div>`;
+                });
+        }
+
+        function calculateMondayWeekLabel(dayStr, lastKnownWeek) {
+            if (!dayStr) return lastKnownWeek || "Week of Current Agenda";
+            const monthMap = { "jan": 0, "feb": 1, "mar": 2, "apr": 3, "may": 4, "jun": 5, "jul": 6, "aug": 7, "sep": 8, "oct": 9, "nov": 10, "dec": 11 };
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            
+            const match = dayStr.match(/([A-Za-z]{3})\s+(\d{1,2})/);
+            if (!match) return lastKnownWeek || "Week of Agenda";
+
+            const monthStr = match[1].toLowerCase().substring(0, 3);
+            const dayNum = parseInt(match[2], 10);
+            if (isNaN(dayNum) || monthMap[monthStr] === undefined) return lastKnownWeek || "Week of Agenda";
+
+            const currentYear = new Date().getFullYear();
+            const taskDate = new Date(currentYear, monthMap[monthStr], dayNum);
+            const dayOfWeek = taskDate.getDay();
+            const distanceToMonday = (dayOfWeek === 0) ? -6 : (1 - dayOfWeek);
+
+            const mondayDate = new Date(taskDate);
+            mondayDate.setDate(taskDate.getDate() + distanceToMonday);
+
+            return "Week of " + monthNames[mondayDate.getMonth()] + " " + mondayDate.getDate();
+        }
+
+        function parseCSVToTasks(csvText) {
+            const lines = csvText.split('\n');
+            const tasks = [];
+            const homeDays = ["Mon", "Wed", "Fri", "Monday", "Wednesday", "Friday"];
+            let runningWeekGroup = "Week of Current Agenda";
+
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+
+                // Regex CSV line parser
+                const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+                const clean = row.map(col => col.replace(/^"|"$/g, '').trim());
+
+                if (clean.length < 5) continue;
+
+                const rawVal = String(clean[0]).toUpperCase();
+                let status = "todo";
+                if (rawVal === "TRUE") status = "completed";
+                else if (rawVal === "PENDING") status = "pending";
+
+                const dayStr = clean[1] || "";
+                const isHomeDay = homeDays.some(hd => dayStr.toLowerCase().includes(hd.toLowerCase()));
+                runningWeekGroup = calculateMondayWeekLabel(dayStr, runningWeekGroup);
+
+                tasks.push({
+                    id: i + 1,
+                    day: dayStr,
+                    weekGroup: runningWeekGroup,
+                    isHomeDay: isHomeDay,
+                    student: clean[2] || "",
+                    subject: clean[3] || "",
+                    assignment: clean[4] || "",
+                    details: clean[5] || "",
+                    status: status
+                });
             }
+            return tasks;
         }
 
         function groupTasksByWeek() {
@@ -266,9 +324,7 @@ function fetchLiveSheetData() {
 
             allSheetTasks.forEach(task => {
                 const weekKey = task.weekGroup || "Week of Agenda";
-                if (!weekGroups[weekKey]) {
-                    weekGroups[weekKey] = [];
-                }
+                if (!weekGroups[weekKey]) weekGroups[weekKey] = [];
                 weekGroups[weekKey].push(task);
             });
 
@@ -281,7 +337,7 @@ function fetchLiveSheetData() {
                     selector.innerHTML += `<option value="${wk}">${wk}</option>`;
                 });
                 if (!activeWeekGroupKey || !weekKeys.includes(activeWeekGroupKey)) {
-                    activeWeekGroupKey = weekKeys[weekKeys.length - 1]; // Default to latest week
+                    activeWeekGroupKey = weekKeys[weekKeys.length - 1];
                 }
                 selector.value = activeWeekGroupKey;
             } else {
@@ -299,19 +355,11 @@ function fetchLiveSheetData() {
         function toggleRole(role) {
             if (role === 'parent') {
                 const pin = prompt("Enter Parent PIN Password:");
-                if (!pin) return;
-
-                if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run
-                        .withSuccessHandler(function(auth) {
-                            if (auth.isAuthorized) {
-                                currentRole = 'parent';
-                                applyRoleUI();
-                            } else {
-                                alert("Access Denied: " + auth.reason);
-                            }
-                        })
-                        .verifyParentAccess(pin);
+                if (pin === PARENT_PIN) {
+                    currentRole = 'parent';
+                    applyRoleUI();
+                } else if (pin) {
+                    alert("Invalid PIN.");
                 }
             } else {
                 currentRole = 'student';
@@ -366,37 +414,18 @@ function fetchLiveSheetData() {
             if (!task) return;
 
             if (currentRole === 'student') {
-                if (task.status === 'todo') {
-                    task.status = 'pending';
-                } else if (task.status === 'pending') {
-                    task.status = 'todo';
-                }
+                task.status = (task.status === 'todo') ? 'pending' : 'todo';
             } else if (currentRole === 'parent') {
-                if (task.status === 'pending') {
-                    task.status = 'completed';
-                } else if (task.status === 'completed') {
-                    task.status = 'pending';
-                } else if (task.status === 'todo') {
-                    task.status = 'completed';
-                }
+                task.status = (task.status === 'completed') ? 'pending' : 'completed';
             }
 
             renderDashboard();
-
-            if (typeof google !== 'undefined' && google.script && google.script.run) {
-                google.script.run.updateRowStatus(taskId, task.status);
-            }
         }
 
         function approveAllPending() {
             const activeTasks = weekGroups[activeWeekGroupKey] || [];
             activeTasks.forEach(t => {
-                if (t.status === 'pending') {
-                    t.status = 'completed';
-                    if (typeof google !== 'undefined' && google.script && google.script.run) {
-                        google.script.run.updateRowStatus(t.id, 'completed');
-                    }
-                }
+                if (t.status === 'pending') t.status = 'completed';
             });
             renderDashboard();
         }
