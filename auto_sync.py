@@ -26,37 +26,28 @@ def download_latest_agenda():
         )
         page = context.new_page()
         
-        # Navigate to login page
+        # Navigate directly to login page
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
         page.wait_for_timeout(2000)
+
+        print("Filling exact credentials...")
+        # Target the Username/Email input directly above Password
+        page.locator('input[type="text"], input[type="email"], input[name*="user" i]').first.fill("Lisabostic")
         
-        print("Filling hardcoded credentials...")
-        # Fill username
-        user_field = page.locator('#Username, input[name="Username"], input[type="text"]').first
-        user_field.wait_for(state="visible", timeout=10000)
-        user_field.click()
-        user_field.fill("LisaBostic")
-        
-        # Fill hardcoded password
-        pass_field = page.locator('#Password, input[name="Password"], input[type="password"]').first
-        pass_field.click()
-        pass_field.fill("Donnie53!")
+        # Target the Password input
+        page.locator('input[type="password"]').first.fill("Donnie53!")
         page.wait_for_timeout(1000)
         
-        # Submit form
-        print("Submitting login form...")
-        submit_btn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Log In"), input[value*="Log In"]').first
-        if submit_btn.is_visible():
-            submit_btn.click()
-        else:
-            pass_field.press("Enter")
+        # Click the exact "Login" button shown in the UI
+        print("Clicking teal Login button...")
+        page.locator('button:has-text("Login"), input[value="Login"], .btn:has-text("Login")').first.click()
             
         page.wait_for_timeout(5000)
         print(f"Post-login URL: {page.url}")
         
         # Verify authentication succeeded
         if "login" in page.url.lower():
-            print("ERROR: Authentication failed with provided credentials.")
+            print("ERROR: Authentication failed with Lisabostic / Donnie53!")
             raise Exception("Authentication failed - redirected back to login page.")
 
         # Wait for home dashboard landing page elements
