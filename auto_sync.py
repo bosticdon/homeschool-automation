@@ -19,7 +19,6 @@ YAHOO_APP_PASS = os.getenv("YAHOO_APP_PASS")
 def download_latest_agenda():
     print("Connecting to Carolina Hybrid ClassReach portal...")
     with sync_playwright() as p:
-        # Launch browser with anti-automation flags disabled
         browser = p.chromium.launch(
             headless=True,
             args=[
@@ -40,14 +39,13 @@ def download_latest_agenda():
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
         page.wait_for_timeout(2000)
 
-        print("Filling credentials with event triggers...")
-        # Fill username character by character to trigger frontend listeners
+        print("Filling email credentials...")
         user_field = page.locator('input[type="text"], input[type="email"], input[name*="user" i]').first
         user_field.click()
-        user_field.press_sequentially("Lisabostic", delay=50)
+        user_field.press_sequentially("bostic_lisa@yahoo.com", delay=50)
         user_field.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))")
 
-        # Fill password
+        print("Filling password...")
         pass_field = page.locator('input[type="password"]').first
         pass_field.click()
         pass_field.press_sequentially("Donnie53!", delay=50)
@@ -55,7 +53,6 @@ def download_latest_agenda():
         
         page.wait_for_timeout(1000)
         
-        # Submit form
         print("Submitting login form...")
         login_btn = page.locator('button:has-text("Login"), input[value="Login"], .btn:has-text("Login")').first
         login_btn.click()
@@ -63,17 +60,14 @@ def download_latest_agenda():
         page.wait_for_timeout(6000)
         print(f"Post-login URL: {page.url}")
         
-        # Verify authentication succeeded
         if "login" in page.url.lower():
-            print("ERROR: Login failed. Checking if email address is required instead of username.")
+            print("ERROR: Authentication failed with bostic_lisa@yahoo.com.")
             raise Exception("Authentication failed - redirected back to login page.")
 
-        # Wait for home dashboard landing page elements
         print("Waiting for ClassReach dashboard...")
         download_btn = page.locator('text="Download Weekly Items"')
         download_btn.wait_for(state="visible", timeout=30000)
         
-        # Click the "Download Weekly Items" button directly under WEEKLY AGENDA
         print("Clicking 'Download Weekly Items' button...")
         with page.expect_download() as download_info:
             download_btn.click()
