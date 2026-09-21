@@ -69,3 +69,76 @@ def download_latest_agenda():
 
 if __name__ == "__main__":
     pdf_file = download_latest_agenda()
+# 2. PARSE PDF AGENDA DATA
+def parse_agenda_pdf(pdf_path):
+    print(f"Parsing PDF agenda: {pdf_path}")
+    extracted_tasks = []
+    
+    with pdfplumber.open(pdf_path) as pdf:
+        for page_num, page in enumerate(pdf.pages, start=1):
+            text = page.extract_text()
+            if not text:
+                continue
+            
+            # Extract lines and structure into task records
+            lines = text.split("\n")
+            current_subject = "General"
+            
+            for line in lines:
+                line_str = line.strip()
+                if not line_str:
+                    continue
+                
+                # Check for headers or subject indicators
+                if any(subj in line_str.upper() for subj in ["MATH", "SCIENCE", "HISTORY", "ENGLISH", "BIBLE", "READING"]):
+                    current_subject = line_str
+                else:
+                    extracted_tasks.append({
+                        "Subject": current_subject,
+                        "Task": line_str,
+                        "Page": page_num
+                    })
+                    
+    print(f"Successfully extracted {len(extracted_tasks)} agenda items.")
+    return extracted_tasks
+
+
+# 3. UPDATE GOOGLE SHEETS DASHBOARD
+def update_google_sheets(tasks):
+    if not GOOGLE_SHEETS_JSON:
+        print("Warning: GOOGLE_SHEETS_JSON environment variable not set. Skipping Sheets update.")
+        return
+        
+    print("Connecting to Google Sheets...")
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    
+    # Save environment JSON string temporarily for authentication
+    with open("credentials.json", "w") as f:
+        f.write(GOOGLE_SHEETS_JSON)
+        
+    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    client = gspread.authorize(creds)
+    
+    # Open target spreadsheet
+    sheet = client.open("Homeschool Dashboard").sheet1
+    
+    # Clear existing rows and write fresh data
+    sheet.clear()
+    headers = ["Subject", "Task Description", "Page Reference"]
+    sheet.append_row(headers)
+    
+    rows_to_append = [[task["Subject"], task["Task"], task["Page"]] for task in tasks]
+    if rows_to_append:
+        sheet.append_rows(rows_to_append)
+        
+    print("Google Sheets dashboard updated successfully!")
+    
+    if os.path.exists("credentials.json"):
+        os.remove("credentials.json")
+
+
+# MAIN EXECUTION FLOW
+if __name__ == "__main__":
+    pdf_file = download_latest_agenda()
+    parsed_tasks = parse_agenda_pdf(pdf_file)
+    update_google_sheets(parsed_tasks)
