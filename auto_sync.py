@@ -113,7 +113,7 @@ def parse_agenda_pdf(pdf_path):
     return extracted_tasks
 
 
-# 3. UPDATE GOOGLE SHEETS DASHBOARD
+# 3. UPDATE GOOGLE SHEETS DASHBOARD (PRESERVING COMPLETION STATUS)
 def update_google_sheets(tasks):
     if not GOOGLE_SHEETS_JSON:
         print("Warning: Neither GCP_SERVICE_ACCOUNT_KEY nor GOOGLE_SHEETS_JSON set. Skipping Sheets update.", flush=True)
@@ -129,19 +129,43 @@ def update_google_sheets(tasks):
     client = gspread.authorize(creds)
     
     sheet = client.open("Homeschool Dashboard").sheet1
-    sheet.clear()
-    headers = ["Subject", "Task Description", "Page Reference"]
-    sheet.append_row(headers)
     
-    rows_to_append = [[task["Subject"], task["Task"], task["Page"]] for task in tasks]
-    if rows_to_append:
-        sheet.append_rows(rows_to_append)
+    # Read existing sheet data to preserve progress
+    existing_data = sheet.get_all_records()
+    
+    # Map existing task statuses: Key = (Subject, Task Description) -> Value = Status
+    status_map = {}
+    for row in existing_data:
+        subject = str(row.get("Subject", "")).strip()
+        task_desc = str(row.get("Task Description", "")).strip()
+        status = str(row.get("Status", "")).strip()
+        if subject and task_desc:
+            status_map[(subject, task_desc)] = status
+
+    # Rebuild headers
+    headers = ["Subject", "Task Description", "Page Reference", "Status"]
+    
+    # Build updated rows maintaining existing completion statuses
+    rows_to_write = []
+    for task in tasks:
+        subj = task["Subject"]
+        desc = task["Task"]
+        page_ref = task["Page"]
         
-    print("Google Sheets dashboard updated successfully!", flush=True)
+        # Keep old status if it exists (e.g. "Complete"), otherwise default to "Pending"
+        saved_status = status_map.get((subj, desc), "Pending")
+        rows_to_write.append([subj, desc, page_ref, saved_status])
+        
+    # Write back without clearing status selections
+    sheet.clear()
+    sheet.append_row(headers)
+    if rows_to_write:
+        sheet.append_rows(rows_to_write)
+        
+    print("Google Sheets dashboard updated without overwriting completion checks!", flush=True)
     
     if os.path.exists("credentials.json"):
         os.remove("credentials.json")
-
 
 # MAIN EXECUTION FLOW
 if __name__ == "__main__":
