@@ -31,16 +31,16 @@ def download_latest_agenda():
         page.wait_for_timeout(2000)
         
         print("Filling credentials...")
-        # Fill username / email using exact ClassReach form attributes
+        # Hardcoded username
         user_field = page.locator('#Username, #email, input[name="Username"], input[name="email"], input[type="text"]').first
         user_field.wait_for(state="visible", timeout=10000)
-        user_field.fill(CLASSREACH_USER)
+        user_field.fill("LisaBostic")
         
-        # Fill password
+        # Password fetched from GitHub Secrets
         pass_field = page.locator('#Password, input[name="Password"], input[type="password"]').first
         pass_field.fill(CLASSREACH_PASS)
         
-        # Submit by clicking the primary submit button
+        # Submit form
         print("Submitting login form...")
         submit_btn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Log In"), input[value*="Log In"]').first
         submit_btn.click()
@@ -50,7 +50,7 @@ def download_latest_agenda():
         
         # Verify authentication succeeded
         if "login" in page.url.lower():
-            print("ERROR: Authentication failed. Please double-check your CLASSREACH_USER and CLASSREACH_PASS values in GitHub Secrets.")
+            print("ERROR: Authentication failed. Please check CLASSREACH_PASS in GitHub Secrets.")
             raise Exception("Authentication failed - redirected back to login page.")
 
         # Wait for home dashboard landing page elements
