@@ -30,36 +30,38 @@ def download_latest_agenda():
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
         page.wait_for_timeout(2000)
         
-        # Target specific input selectors or fill visible text/password fields
         print("Filling credentials...")
-        page.locator('input:not([type="hidden"]):not([type="submit"])').nth(0).fill(CLASSREACH_USER)
-        page.locator('input[type="password"]:visible').first.fill(CLASSREACH_PASS)
+        # Fill username / email using exact ClassReach form attributes
+        user_field = page.locator('#Username, #email, input[name="Username"], input[name="email"], input[type="text"]').first
+        user_field.wait_for(state="visible", timeout=10000)
+        user_field.fill(CLASSREACH_USER)
         
-        # Submit by clicking the login button explicitly
+        # Fill password
+        pass_field = page.locator('#Password, input[name="Password"], input[type="password"]').first
+        pass_field.fill(CLASSREACH_PASS)
+        
+        # Submit by clicking the primary submit button
         print("Submitting login form...")
-        submit_btn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Log In"), input[value*="Log In"]')
-        if submit_btn.count() > 0:
-            submit_btn.first.click()
-        else:
-            page.locator('input[type="password"]:visible').first.press("Enter")
+        submit_btn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Log In"), input[value*="Log In"]').first
+        submit_btn.click()
             
         page.wait_for_timeout(5000)
         print(f"Post-login URL: {page.url}")
         
-        # Check if we are still stuck on the login page
+        # Verify authentication succeeded
         if "login" in page.url.lower():
-            print("ERROR: Still on login page. Please verify CLASSREACH_USER and CLASSREACH_PASS in GitHub Secrets.")
+            print("ERROR: Authentication failed. Please double-check your CLASSREACH_USER and CLASSREACH_PASS values in GitHub Secrets.")
             raise Exception("Authentication failed - redirected back to login page.")
 
         # Wait for home dashboard landing page elements
         print("Waiting for ClassReach dashboard...")
-        download_btn = page.locator('text=/Download Weekly/i, a:has-text("Download"), button:has-text("Download")')
-        download_btn.first.wait_for(state="visible", timeout=30000)
+        download_btn = page.locator('text="Download Weekly Items"')
+        download_btn.wait_for(state="visible", timeout=30000)
         
         # Click the "Download Weekly Items" button directly under WEEKLY AGENDA
         print("Clicking 'Download Weekly Items' button...")
         with page.expect_download() as download_info:
-            download_btn.first.click()
+            download_btn.click()
         
         download = download_info.value
         pdf_path = "latest_agenda.pdf"
