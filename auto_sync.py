@@ -19,35 +19,53 @@ YAHOO_APP_PASS = os.getenv("YAHOO_APP_PASS")
 def download_latest_agenda():
     print("Connecting to Carolina Hybrid ClassReach portal...")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        # Launch browser with anti-automation flags disabled
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-setuid-sandbox"
+            ]
+        )
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 720}
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            viewport={"width": 1366, "height": 768}
         )
         page = context.new_page()
         
-        # Navigate directly to login page
+        # Override navigator.webdriver flag
+        page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
         page.wait_for_timeout(2000)
 
-        print("Filling exact credentials...")
-        # Target the Username/Email input directly above Password
-        page.locator('input[type="text"], input[type="email"], input[name*="user" i]').first.fill("Lisabostic")
+        print("Filling credentials with event triggers...")
+        # Fill username character by character to trigger frontend listeners
+        user_field = page.locator('input[type="text"], input[type="email"], input[name*="user" i]').first
+        user_field.click()
+        user_field.press_sequentially("Lisabostic", delay=50)
+        user_field.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))")
+
+        # Fill password
+        pass_field = page.locator('input[type="password"]').first
+        pass_field.click()
+        pass_field.press_sequentially("Donnie53!", delay=50)
+        pass_field.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))")
         
-        # Target the Password input
-        page.locator('input[type="password"]').first.fill("Donnie53!")
         page.wait_for_timeout(1000)
         
-        # Click the exact "Login" button shown in the UI
-        print("Clicking teal Login button...")
-        page.locator('button:has-text("Login"), input[value="Login"], .btn:has-text("Login")').first.click()
+        # Submit form
+        print("Submitting login form...")
+        login_btn = page.locator('button:has-text("Login"), input[value="Login"], .btn:has-text("Login")').first
+        login_btn.click()
             
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(6000)
         print(f"Post-login URL: {page.url}")
         
         # Verify authentication succeeded
         if "login" in page.url.lower():
-            print("ERROR: Authentication failed with Lisabostic / Donnie53!")
+            print("ERROR: Login failed. Checking if email address is required instead of username.")
             raise Exception("Authentication failed - redirected back to login page.")
 
         # Wait for home dashboard landing page elements
