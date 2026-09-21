@@ -5,7 +5,7 @@ import pdfplumber
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
+import playwright_stealth
 
 # CLASSREACH & SHEETS CONFIG
 CLASSREACH_USER = os.getenv("CLASSREACH_USER", "bostic_lisa@yahoo.com")
@@ -30,16 +30,16 @@ def download_latest_agenda():
         )
         page = context.new_page()
         
-        # Apply stealth using the module's stealth function
-        stealth_sync(page)
+        # Apply stealth patches using direct module call
+        playwright_stealth.stealth_sync(page)
         
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
         print("Waiting for Cloudflare verification to complete...")
         page.wait_for_timeout(5000)
 
         print("Filling credentials...")
-        page.fill('input[type="text"], input[type="email"], input[name*="user" i]', "bostic_lisa@yahoo.com")
-        page.fill('input[type="password"]', "Donnie53!")
+        page.fill('input[type="text"], input[type="email"], input[name*="user" i]', CLASSREACH_USER)
+        page.fill('input[type="password"]', CLASSREACH_PASS)
         page.wait_for_timeout(1000)
         
         print("Clicking Login button...")
@@ -67,8 +67,7 @@ def download_latest_agenda():
         print("ClassReach PDF successfully downloaded.")
         return pdf_path
 
-if __name__ == "__main__":
-    pdf_file = download_latest_agenda()
+
 # 2. PARSE PDF AGENDA DATA
 def parse_agenda_pdf(pdf_path):
     print(f"Parsing PDF agenda: {pdf_path}")
@@ -80,7 +79,6 @@ def parse_agenda_pdf(pdf_path):
             if not text:
                 continue
             
-            # Extract lines and structure into task records
             lines = text.split("\n")
             current_subject = "General"
             
@@ -89,7 +87,6 @@ def parse_agenda_pdf(pdf_path):
                 if not line_str:
                     continue
                 
-                # Check for headers or subject indicators
                 if any(subj in line_str.upper() for subj in ["MATH", "SCIENCE", "HISTORY", "ENGLISH", "BIBLE", "READING"]):
                     current_subject = line_str
                 else:
@@ -112,17 +109,13 @@ def update_google_sheets(tasks):
     print("Connecting to Google Sheets...")
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # Save environment JSON string temporarily for authentication
     with open("credentials.json", "w") as f:
         f.write(GOOGLE_SHEETS_JSON)
         
     creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
     client = gspread.authorize(creds)
     
-    # Open target spreadsheet
     sheet = client.open("Homeschool Dashboard").sheet1
-    
-    # Clear existing rows and write fresh data
     sheet.clear()
     headers = ["Subject", "Task Description", "Page Reference"]
     sheet.append_row(headers)
