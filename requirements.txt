@@ -1,6 +1,6 @@
-playwright
-pypdf
-gspread
-google-auth
 playwright==1.40.0
 playwright-stealth
+pdfplumber
+gspread
+oauth2client
+pandas
