@@ -32,28 +32,34 @@ def download_latest_agenda():
         
         # Target specific input selectors or fill visible text/password fields
         print("Filling credentials...")
-        if page.locator('input[type="email"]').is_visible():
-            page.fill('input[type="email"]', CLASSREACH_USER)
-        elif page.locator('input[name="Email"]').is_visible():
-            page.fill('input[name="Email"]', CLASSREACH_USER)
-        else:
-            page.locator('input[type="text"]:visible').first.fill(CLASSREACH_USER)
-            
+        page.locator('input:not([type="hidden"]):not([type="submit"])').nth(0).fill(CLASSREACH_USER)
         page.locator('input[type="password"]:visible').first.fill(CLASSREACH_PASS)
         
-        # Submit the form by pressing Enter or clicking the Log In button
+        # Submit by clicking the login button explicitly
         print("Submitting login form...")
-        page.locator('input[type="password"]:visible').first.press("Enter")
-        page.wait_for_timeout(4000)
+        submit_btn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Log In"), input[value*="Log In"]')
+        if submit_btn.count() > 0:
+            submit_btn.first.click()
+        else:
+            page.locator('input[type="password"]:visible').first.press("Enter")
+            
+        page.wait_for_timeout(5000)
+        print(f"Post-login URL: {page.url}")
         
+        # Check if we are still stuck on the login page
+        if "login" in page.url.lower():
+            print("ERROR: Still on login page. Please verify CLASSREACH_USER and CLASSREACH_PASS in GitHub Secrets.")
+            raise Exception("Authentication failed - redirected back to login page.")
+
         # Wait for home dashboard landing page elements
         print("Waiting for ClassReach dashboard...")
-        page.wait_for_selector('text=Download Weekly Items', timeout=30000)
+        download_btn = page.locator('text=/Download Weekly/i, a:has-text("Download"), button:has-text("Download")')
+        download_btn.first.wait_for(state="visible", timeout=30000)
         
         # Click the "Download Weekly Items" button directly under WEEKLY AGENDA
         print("Clicking 'Download Weekly Items' button...")
         with page.expect_download() as download_info:
-            page.click('text=Download Weekly Items')
+            download_btn.first.click()
         
         download = download_info.value
         pdf_path = "latest_agenda.pdf"
