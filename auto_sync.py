@@ -33,36 +33,37 @@ def download_latest_agenda():
         )
         page = context.new_page()
         
-        # Override navigator.webdriver flag
         page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
         page.wait_for_timeout(2000)
 
-        print("Filling email credentials...")
-        user_field = page.locator('input[type="text"], input[type="email"], input[name*="user" i]').first
-        user_field.click()
-        user_field.press_sequentially("bostic_lisa@yahoo.com", delay=50)
-        user_field.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))")
-
-        print("Filling password...")
-        pass_field = page.locator('input[type="password"]').first
-        pass_field.click()
-        pass_field.press_sequentially("Donnie53!", delay=50)
-        pass_field.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))")
+        print("Filling credentials...")
+        # Fill username / email
+        page.fill('input[type="text"], input[type="email"], input[name*="user" i]', "bostic_lisa@yahoo.com")
+        
+        # Fill password
+        page.fill('input[type="password"]', "Donnie53!")
         
         page.wait_for_timeout(1000)
         
-        print("Submitting login form...")
-        login_btn = page.locator('button:has-text("Login"), input[value="Login"], .btn:has-text("Login")').first
-        login_btn.click()
+        print("Submitting login form and awaiting redirect...")
+        # Expect navigation upon clicking Login
+        try:
+            with page.expect_navigation(timeout=15000):
+                page.click('button:has-text("Login"), input[value="Login"], .btn:has-text("Login")')
+        except Exception:
+            # Fallback if form submits without full page reload
+            pass
             
-        page.wait_for_timeout(6000)
+        page.wait_for_timeout(5000)
         print(f"Post-login URL: {page.url}")
         
         if "login" in page.url.lower():
-            print("ERROR: Authentication failed with bostic_lisa@yahoo.com.")
-            raise Exception("Authentication failed - redirected back to login page.")
+            # Print page body text to catch specific error message (e.g. invalid password vs anti-bot block)
+            body_text = page.locator('body').inner_text()
+            print("Login page response text snippet:", body_text[:300].replace('\n', ' '))
+            raise Exception("Authentication failed - stayed on login page.")
 
         print("Waiting for ClassReach dashboard...")
         download_btn = page.locator('text="Download Weekly Items"')
