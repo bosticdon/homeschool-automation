@@ -1,4 +1,16 @@
 <!DOCTYPE html>
+const SHEET_ID = "1joCg9NZiCzTPAhiIt-LXiT6UVVnTzL19788BVZ1JqA4";
+
+function fetchLiveSheetData() {
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Dashboard`;
+    fetch(csvUrl)
+        .then(res => res.text())
+        .then(csvText => {
+            allSheetTasks = parseCSVToTasks(csvText);
+            groupTasksByWeek();
+            renderDashboard();
+        });
+}
 <html lang="en" class="h-full bg-slate-950">
 <head>
     <meta charset="UTF-8">
