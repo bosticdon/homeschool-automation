@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import gspread
 import pdfplumber
@@ -6,16 +7,19 @@ import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright
 
+# Force Python to print logs immediately without buffering
+sys.stdout.reconfigure(line_buffering=True)
+
 # CLASSREACH & SHEETS CONFIG
 CLASSREACH_USER = os.getenv("CLASSREACH_USER", "bostic_lisa@yahoo.com")
 CLASSREACH_PASS = os.getenv("CLASSREACH_PASS", "Donnie53!")
-GOOGLE_SHEETS_JSON = os.getenv("GOOGLE_SHEETS_JSON")
+# Map both possible secret variable names
+GOOGLE_SHEETS_JSON = os.getenv("GCP_SERVICE_ACCOUNT_KEY") or os.getenv("GOOGLE_SHEETS_JSON")
 
 # 1. SCRAPE LATEST AGENDA PDF FROM CLASSREACH
 def download_latest_agenda():
-    print("Connecting to Carolina Hybrid ClassReach portal...")
+    print("Connecting to Carolina Hybrid ClassReach portal...", flush=True)
     with sync_playwright() as p:
-        # Launch Chromium with anti-bot detection evasions built-in
         browser = p.chromium.launch(
             headless=True,
             args=[
@@ -37,7 +41,7 @@ def download_latest_agenda():
         )
         page = context.new_page()
         
-        # Mask automation flags from JavaScript window/navigator
+        # Mask automation flags
         page.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             window.navigator.chrome = { runtime: {} };
@@ -46,29 +50,29 @@ def download_latest_agenda():
         """)
         
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
-        print("Waiting for Cloudflare verification...")
+        print("Waiting for Cloudflare verification...", flush=True)
         page.wait_for_timeout(5000)
 
-        print("Filling credentials...")
+        print("Filling credentials...", flush=True)
         page.fill('input[type="text"], input[type="email"], input[name*="user" i]', CLASSREACH_USER)
         page.fill('input[type="password"]', CLASSREACH_PASS)
         page.wait_for_timeout(1000)
         
-        print("Clicking Login button...")
+        print("Clicking Login button...", flush=True)
         page.click('button:has-text("Login"), input[value="Login"], .btn:has-text("Login")')
         page.wait_for_timeout(6000)
-        print(f"Post-login URL: {page.url}")
+        print(f"Post-login URL: {page.url}", flush=True)
 
         if "login" in page.url.lower():
             body_text = page.locator('body').inner_text()
-            print("Login page response snippet:", body_text[:300].replace('\n', ' '))
+            print("Login page response snippet:", body_text[:300].replace('\n', ' '), flush=True)
             raise Exception("Authentication failed - stayed on login page.")
 
-        print("Waiting for ClassReach dashboard...")
+        print("Waiting for ClassReach dashboard...", flush=True)
         download_btn = page.locator('text="Download Weekly Items"')
         download_btn.wait_for(state="visible", timeout=30000)
         
-        print("Clicking 'Download Weekly Items' button...")
+        print("Clicking 'Download Weekly Items' button...", flush=True)
         with page.expect_download() as download_info:
             download_btn.click()
         
@@ -76,13 +80,13 @@ def download_latest_agenda():
         pdf_path = "latest_agenda.pdf"
         download.save_as(pdf_path)
         browser.close()
-        print("ClassReach PDF successfully downloaded.")
+        print("ClassReach PDF successfully downloaded.", flush=True)
         return pdf_path
 
 
 # 2. PARSE PDF AGENDA DATA
 def parse_agenda_pdf(pdf_path):
-    print(f"Parsing PDF agenda: {pdf_path}")
+    print(f"Parsing PDF agenda: {pdf_path}", flush=True)
     extracted_tasks = []
     
     with pdfplumber.open(pdf_path) as pdf:
@@ -108,17 +112,17 @@ def parse_agenda_pdf(pdf_path):
                         "Page": page_num
                     })
                     
-    print(f"Successfully extracted {len(extracted_tasks)} agenda items.")
+    print(f"Successfully extracted {len(extracted_tasks)} agenda items.", flush=True)
     return extracted_tasks
 
 
 # 3. UPDATE GOOGLE SHEETS DASHBOARD
 def update_google_sheets(tasks):
     if not GOOGLE_SHEETS_JSON:
-        print("Warning: GOOGLE_SHEETS_JSON environment variable not set. Skipping Sheets update.")
+        print("Warning: Neither GCP_SERVICE_ACCOUNT_KEY nor GOOGLE_SHEETS_JSON set. Skipping Sheets update.", flush=True)
         return
         
-    print("Connecting to Google Sheets...")
+    print("Connecting to Google Sheets...", flush=True)
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
     with open("credentials.json", "w") as f:
@@ -136,7 +140,7 @@ def update_google_sheets(tasks):
     if rows_to_append:
         sheet.append_rows(rows_to_append)
         
-    print("Google Sheets dashboard updated successfully!")
+    print("Google Sheets dashboard updated successfully!", flush=True)
     
     if os.path.exists("credentials.json"):
         os.remove("credentials.json")
