@@ -17,24 +17,27 @@ YAHOO_EMAIL = os.getenv("YAHOO_EMAIL")
 YAHOO_APP_PASS = os.getenv("YAHOO_APP_PASS")
 # 1. SCRAPE LATEST AGENDA PDF FROM CLASSREACH
 def download_latest_agenda():
-    print("Connecting to ClassReach...")
+    print("Connecting to Carolina Hybrid ClassReach portal...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 720}
         )
         page = context.new_page()
         
-        # Navigate to login
-        page.goto("https://app.classreach.com/login", wait_until="networkidle")
+        # Navigate directly to Carolina Hybrid login page
+        page.goto("https://carolinahybrid.classreach.com/login", wait_until="domcontentloaded")
         
-        # Fill credentials
+        # Fill email and password
         email_selector = 'input[type="email"], input[name="email"], input[name="username"], input[placeholder*="Email"]'
         page.wait_for_selector(email_selector, timeout=20000)
         page.fill(email_selector, CLASSREACH_USER)
         
         pass_selector = 'input[type="password"], input[name="password"]'
         page.fill(pass_selector, CLASSREACH_PASS)
+        
+        # Click login button
         page.click('button[type="submit"], input[type="submit"], button:has-text("Log In")')
         
         # Wait for home dashboard to render
