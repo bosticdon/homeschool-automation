@@ -14,17 +14,23 @@ GOOGLE_SHEETS_JSON = os.getenv("GOOGLE_SHEETS_JSON")
 
 # 1. SCRAPE LATEST AGENDA PDF FROM CLASSREACH
 def download_latest_agenda():
-    print("Connecting to Carolina Hybrid ClassReach portal via Stealth Firefox...")
+    print("Connecting to Carolina Hybrid ClassReach portal via Stealth Browser...")
     with sync_playwright() as p:
-        # Launch Firefox with stealth configuration
-        browser = p.firefox.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-setuid-sandbox"
+            ]
+        )
         context = browser.new_context(
             viewport={"width": 1920, "height": 1080},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
         )
         page = context.new_page()
         
-        # Apply stealth patches to bypass Cloudflare detection
+        # Apply stealth using the module's stealth function
         stealth_sync(page)
         
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
