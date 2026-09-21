@@ -5,7 +5,7 @@ import pdfplumber
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 from playwright.sync_api import sync_playwright
-import playwright_stealth
+from playwright_stealth import stealth_sync
 
 # CLASSREACH & SHEETS CONFIG
 CLASSREACH_USER = os.getenv("CLASSREACH_USER", "bostic_lisa@yahoo.com")
@@ -30,8 +30,8 @@ def download_latest_agenda():
         )
         page = context.new_page()
         
-        # Apply stealth patches using direct module call
-        playwright_stealth.stealth_sync(page)
+        # Apply stealth patches
+        stealth_sync(page)
         
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
         print("Waiting for Cloudflare verification to complete...")
