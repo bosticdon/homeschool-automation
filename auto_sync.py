@@ -26,39 +26,29 @@ def download_latest_agenda():
         )
         page = context.new_page()
         
-        # Navigate to portal landing page
-        page.goto("https://carolinahybrid.classreach.com/", wait_until="networkidle")
-        page.wait_for_timeout(3000)
-        print(f"Loaded page URL: {page.url}")
+        # Navigate to login page
+        page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
+        page.wait_for_timeout(2000)
         
-        # Check if we need to click a 'Sign In' or 'Log In' link first
-        login_btn = page.locator('a:has-text("Log In"), button:has-text("Log In"), a:has-text("Sign In")')
-        if login_btn.count() > 0 and login_btn.first.is_visible():
-            print("Clicking initial login button...")
-            login_btn.first.click()
-            page.wait_for_timeout(3000)
-
-        # Locate email and password fields dynamically
-        print("Waiting for login input fields...")
-        page.wait_for_selector('input', timeout=20000)
-        
-        # Fill email and password into the first two visible inputs
-        inputs = page.locator('input:visible')
-        print(f"Found {inputs.count()} visible input fields.")
-        
-        if inputs.count() >= 2:
-            inputs.nth(0).fill(CLASSREACH_USER)
-            inputs.nth(1).fill(CLASSREACH_PASS)
+        # Target specific input selectors or fill visible text/password fields
+        print("Filling credentials...")
+        if page.locator('input[type="email"]').is_visible():
+            page.fill('input[type="email"]', CLASSREACH_USER)
+        elif page.locator('input[name="Email"]').is_visible():
+            page.fill('input[name="Email"]', CLASSREACH_USER)
         else:
-            page.fill('input[type="email"], input[name="email"], input[name="username"]', CLASSREACH_USER)
-            page.fill('input[type="password"], input[name="password"]', CLASSREACH_PASS)
+            page.locator('input[type="text"]:visible').first.fill(CLASSREACH_USER)
             
-        # Click submit
-        page.click('button[type="submit"], input[type="submit"], button:has-text("Log In")')
+        page.locator('input[type="password"]:visible').first.fill(CLASSREACH_PASS)
         
-        # Wait for home dashboard to render
+        # Submit the form by pressing Enter or clicking the Log In button
+        print("Submitting login form...")
+        page.locator('input[type="password"]:visible').first.press("Enter")
+        page.wait_for_timeout(4000)
+        
+        # Wait for home dashboard landing page elements
         print("Waiting for ClassReach dashboard...")
-        page.wait_for_selector('text=Download Weekly Items', timeout=25000)
+        page.wait_for_selector('text=Download Weekly Items', timeout=30000)
         
         # Click the "Download Weekly Items" button directly under WEEKLY AGENDA
         print("Clicking 'Download Weekly Items' button...")
