@@ -26,18 +26,34 @@ def download_latest_agenda():
         )
         page = context.new_page()
         
-        # Navigate directly to Carolina Hybrid login page
-        page.goto("https://carolinahybrid.classreach.com/login", wait_until="domcontentloaded")
+        # Navigate to portal landing page
+        page.goto("https://carolinahybrid.classreach.com/", wait_until="networkidle")
+        page.wait_for_timeout(3000)
+        print(f"Loaded page URL: {page.url}")
         
-        # Fill email and password
-        email_selector = 'input[type="email"], input[name="email"], input[name="username"], input[placeholder*="Email"]'
-        page.wait_for_selector(email_selector, timeout=20000)
-        page.fill(email_selector, CLASSREACH_USER)
+        # Check if we need to click a 'Sign In' or 'Log In' link first
+        login_btn = page.locator('a:has-text("Log In"), button:has-text("Log In"), a:has-text("Sign In")')
+        if login_btn.count() > 0 and login_btn.first.is_visible():
+            print("Clicking initial login button...")
+            login_btn.first.click()
+            page.wait_for_timeout(3000)
+
+        # Locate email and password fields dynamically
+        print("Waiting for login input fields...")
+        page.wait_for_selector('input', timeout=20000)
         
-        pass_selector = 'input[type="password"], input[name="password"]'
-        page.fill(pass_selector, CLASSREACH_PASS)
+        # Fill email and password into the first two visible inputs
+        inputs = page.locator('input:visible')
+        print(f"Found {inputs.count()} visible input fields.")
         
-        # Click login button
+        if inputs.count() >= 2:
+            inputs.nth(0).fill(CLASSREACH_USER)
+            inputs.nth(1).fill(CLASSREACH_PASS)
+        else:
+            page.fill('input[type="email"], input[name="email"], input[name="username"]', CLASSREACH_USER)
+            page.fill('input[type="password"], input[name="password"]', CLASSREACH_PASS)
+            
+        # Click submit
         page.click('button[type="submit"], input[type="submit"], button:has-text("Log In")')
         
         # Wait for home dashboard to render
