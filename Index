@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homeschool Learning Hub & Agenda Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.5); }
+    </style>
+</head>
+<body class="h-full text-slate-100 flex flex-col overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black">
+
+    <!-- HEADER -->
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shrink-0">
+        <div class="flex items-center space-x-4">
+            <div class="bg-gradient-to-tr from-indigo-600 to-violet-500 text-white p-2.5 rounded-xl shadow-lg shadow-indigo-500/20">
+                <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs font-semibold uppercase tracking-widest text-indigo-400 font-mono">Hybrid Homeschool Command</span>
+                    <span class="bg-indigo-500/10 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/20">CLASSREACH SYNC</span>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                    Weekly Learning Dashboard
+                </h1>
+            </div>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-3">
+            <!-- ARCHIVED WEEK SELECTOR -->
+            <div class="bg-slate-950/80 border border-slate-800/60 rounded-xl p-1.5 flex items-center space-x-2 text-xs font-mono">
+                <i data-lucide="folder-archive" class="w-4 h-4 text-indigo-400 ml-1"></i>
+                <span class="text-slate-500 font-bold uppercase text-[10px]">ARCHIVED WEEK:</span>
+                <select id="week-selector" onchange="changeWeekGroup(this.value)" class="bg-slate-900 text-indigo-300 font-bold border border-slate-700 rounded-lg px-2.5 py-1 focus:outline-none focus:border-indigo-500 cursor-pointer">
+                    <option value="">Loading weeks...</option>
+                </select>
+            </div>
+
+            <!-- ROLE TOGGLE -->
+            <div class="bg-slate-950/80 border border-slate-800/60 rounded-xl p-2 flex items-center space-x-3 text-[10px] font-mono">
+                <span class="text-slate-500 uppercase font-bold px-1">ROLE:</span>
+                <button onclick="toggleRole('student')" id="role-btn-student" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold transition">Student</button>
+                <button onclick="toggleRole('parent')" id="role-btn-parent" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition">Parent / Verifier</button>
+            </div>
+
+            <div class="bg-slate-950/80 border border-slate-800/60 rounded-xl p-2 flex items-center space-x-2 text-[10px] font-mono">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-slate-300 font-bold" id="pending-count-badge">0 Pending Approvals</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- SIDEBAR NAVIGATION -->
+        <aside class="w-64 bg-slate-900/40 border-r border-slate-800/60 p-4 hidden md:flex flex-col justify-between shrink-0 overflow-y-auto">
+            <div class="space-y-6">
+                <div>
+                    <span class="text-slate-500 text-[10px] font-bold uppercase tracking-wider block px-3 mb-2">Student Views</span>
+                    <nav class="space-y-1">
+                        <button onclick="setStudentFilter('ALL')" id="btn-std-all" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-lg shadow-indigo-600/10 transition">
+                            <span class="flex items-center space-x-3"><i data-lucide="users" class="w-4 h-4"></i><span>All Students</span></span>
+                            <span id="badge-all-count" class="text-[10px] bg-indigo-950/80 px-2 py-0.5 rounded-full font-mono">0</span>
+                        </button>
+                        <button onclick="setStudentFilter('MaryKathryn')" id="btn-std-mk" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-850 hover:text-white transition">
+                            <span class="flex items-center space-x-3"><i data-lucide="user" class="w-4 h-4 text-violet-400"></i><span>MaryKathryn</span></span>
+                            <span id="badge-mk-count" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full font-mono">0</span>
+                        </button>
+                        <button onclick="setStudentFilter('John')" id="btn-std-john" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-850 hover:text-white transition">
+                            <span class="flex items-center space-x-3"><i data-lucide="user" class="w-4 h-4 text-teal-400"></i><span>John</span></span>
+                            <span id="badge-john-count" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full font-mono">0</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <div>
+                    <span class="text-slate-500 text-[10px] font-bold uppercase tracking-wider block px-3 mb-2">Schedule Views</span>
+                    <nav class="space-y-1">
+                        <button onclick="setDayFilter('HOME')" id="btn-day-home" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium bg-slate-800/80 text-emerald-400 border border-emerald-500/20 transition">
+                            <i data-lucide="home" class="w-4 h-4"></i><span>Home Days (M/W/F)</span>
+                        </button>
+                        <button onclick="setDayFilter('ALL')" id="btn-day-all" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-850 hover:text-white transition">
+                            <i data-lucide="calendar" class="w-4 h-4 text-indigo-400"></i><span>Full Calendar Week</span>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 font-bold text-sm">HS</div>
+                <div>
+                    <h4 class="text-xs font-bold text-slate-200">Parent Supervisor</h4>
+                    <p class="text-[10px] text-slate-400" id="role-label-text">Mode: Student Workstation</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN WORKSPACE -->
+        <main class="flex-1 flex flex-col overflow-y-auto bg-slate-950/20 p-4 md:p-6 space-y-6">
+
+            <!-- STATS AND PROGRESS ROW -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- COMPLETION RING -->
+                <div class="bg-slate-900/40 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-slate-200 flex items-center gap-2 text-sm">
+                            <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-400"></i>
+                            <span>Weekly Progress Tracker</span>
+                        </h3>
+                        <span class="text-[10px] font-mono text-slate-500 uppercase" id="archive-tab-label">Current Week</span>
+                    </div>
+                    
+                    <div class="relative flex items-center justify-center h-40">
+                        <canvas id="progressRingChart"></canvas>
+                        <div class="absolute flex flex-col items-center justify-center pointer-events-none text-center">
+                            <span id="stat-center-rate" class="text-2xl font-extrabold text-white">0%</span>
+                            <span class="text-[9px] uppercase font-bold text-slate-400 font-mono">Verified</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 text-center text-[10px] font-mono pt-2 border-t border-slate-800">
+                        <div>
+                            <span class="text-emerald-400 font-bold block text-sm" id="stat-lbl-verified">0</span>
+                            <span class="text-slate-500">Verified</span>
+                        </div>
+                        <div>
+                            <span class="text-amber-400 font-bold block text-sm" id="stat-lbl-pending">0</span>
+                            <span class="text-slate-500">Pending</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 font-bold block text-sm" id="stat-lbl-todo">0</span>
+                            <span class="text-slate-500">To Do</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PARENT VERIFICATION ACTION BRIEFING -->
+                <div class="bg-slate-900/40 border border-slate-800/80 p-5 rounded-2xl lg:col-span-2 flex flex-col justify-between space-y-4">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <h3 class="font-bold text-slate-200 flex items-center gap-2 text-sm">
+                            <i data-lucide="shield-check" class="w-4 h-4 text-amber-400"></i>
+                            <span>Verification Queue & Summary</span>
+                        </h3>
+                        <span class="text-xs font-mono text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded-full font-semibold">Dual-State Check</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-850 space-y-1">
+                            <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">MaryKathryn Status</span>
+                            <h4 id="kpi-mk-status" class="text-lg font-bold text-white">0 / 0 Done</h4>
+                            <p class="text-[10px] text-slate-500" id="kpi-mk-sub">0 Pending Verification</p>
+                        </div>
+
+                        <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-850 space-y-1">
+                            <span class="text-[10px] font-bold text-teal-400 uppercase tracking-wider block">John Status</span>
+                            <h4 id="kpi-john-status" class="text-lg font-bold text-white">0 / 0 Done</h4>
+                            <p class="text-[10px] text-slate-500" id="kpi-john-sub">0 Pending Verification</p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-indigo-950/80 to-slate-950 p-4 rounded-xl border border-indigo-500/30 space-y-1 relative overflow-hidden shadow-lg shadow-indigo-500/10">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">Active Mode</span>
+                                <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-400" id="role-icon"></i>
+                            </div>
+                            <h4 id="kpi-role-display" class="text-lg font-extrabold text-amber-300">Student Mode</h4>
+                            <p class="text-[10px] text-indigo-300/80">Kids check tasks &rarr; Parents verify</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950/40 p-3 rounded-xl border border-slate-850/60 flex items-center justify-between">
+                        <div class="flex items-center space-x-2 text-xs text-slate-400">
+                            <i data-lucide="info" class="w-4 h-4 text-indigo-400"></i>
+                            <span>Parent Mode allows one-click approval of all pending student completions.</span>
+                        </div>
+                        <button onclick="approveAllPending()" id="btn-approve-all" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-md shadow-emerald-600/20">
+                            Approve All Pending
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CALENDAR GRID DASHBOARD VIEW -->
+            <div class="bg-slate-900/30 border border-slate-800/80 p-5 rounded-2xl space-y-5">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                    <div class="flex items-center space-x-3">
+                        <div>
+                            <div class="flex items-center space-x-3">
+                                <h3 class="font-bold text-slate-200 text-lg flex items-center gap-2">
+                                    <i data-lucide="calendar-days" class="w-5 h-5 text-indigo-400"></i>
+                                    <span id="calendar-view-title">Schedule</span>
+                                </h3>
+
+                                <!-- PILL BOX SHOWING ACTIVE ARCHIVED WEEK -->
+                                <span id="week-pill-box" class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-mono font-bold text-xs px-3 py-1 rounded-full shadow-md shadow-indigo-500/20 border border-indigo-400/30 flex items-center space-x-1.5">
+                                    <i data-lucide="archive" class="w-3.5 h-3.5"></i>
+                                    <span id="week-pill-text">Detecting Week...</span>
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1">
+                                Click a date tab below to focus on that specific day's assignments.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- DAY TABS FOR CALENDAR NAV -->
+                    <div class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 flex-wrap" id="day-tabs-container">
+                        <!-- Dynamic Day Pills -->
+                    </div>
+                </div>
+
+                <!-- SINGLE DAY CALENDAR CONTAINER -->
+                <div id="calendar-grid-container" class="space-y-4">
+                    <div class="text-center py-12 text-slate-500 font-mono text-sm">
+                        Loading tasks from Google Sheet...
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- DATA ENGINE CONNECTED TO GOOGLE APPS SCRIPT -->
+    <script>
+        let allSheetTasks = [];
+        let weekGroups = {};
+        let activeWeekGroupKey = '';
+        let currentStudentFilter = 'ALL';
+        let currentDayFilter = 'HOME';
+        let selectedDayTab = '';
+        let currentRole = 'student';
+        let ringChartInstance = null;
+
+        function fetchLiveSheetData() {
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run
+                    .withSuccessHandler(function(data) {
+                        allSheetTasks = data || [];
+                        groupTasksByWeek();
+                        renderDashboard();
+                    })
+                    .getHomeschoolData();
+            }
+        }
+
+        function groupTasksByWeek() {
+            weekGroups = {};
+
+            allSheetTasks.forEach(task => {
+                const weekKey = task.weekGroup || "Week of Agenda";
+                if (!weekGroups[weekKey]) {
+                    weekGroups[weekKey] = [];
+                }
+                weekGroups[weekKey].push(task);
+            });
+
+            const weekKeys = Object.keys(weekGroups);
+            const selector = document.getElementById('week-selector');
+            selector.innerHTML = '';
+
+            if (weekKeys.length > 0) {
+                weekKeys.forEach(wk => {
+                    selector.innerHTML += `<option value="${wk}">${wk}</option>`;
+                });
+                if (!activeWeekGroupKey || !weekKeys.includes(activeWeekGroupKey)) {
+                    activeWeekGroupKey = weekKeys[weekKeys.length - 1]; // Default to latest week
+                }
+                selector.value = activeWeekGroupKey;
+            } else {
+                selector.innerHTML = `<option value="">No Dates Detected</option>`;
+            }
+        }
+
+        function changeWeekGroup(weekKey) {
+            if (!weekKey) return;
+            activeWeekGroupKey = weekKey;
+            selectedDayTab = '';
+            renderDashboard();
+        }
+
+        function toggleRole(role) {
+            if (role === 'parent') {
+                const pin = prompt("Enter Parent PIN Password:");
+                if (!pin) return;
+
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(function(auth) {
+                            if (auth.isAuthorized) {
+                                currentRole = 'parent';
+                                applyRoleUI();
+                            } else {
+                                alert("Access Denied: " + auth.reason);
+                            }
+                        })
+                        .verifyParentAccess(pin);
+                }
+            } else {
+                currentRole = 'student';
+                applyRoleUI();
+            }
+        }
+
+        function applyRoleUI() {
+            document.getElementById('role-btn-student').className = currentRole === 'student' ? 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold transition' : 'px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition';
+            document.getElementById('role-btn-parent').className = currentRole === 'parent' ? 'px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold transition' : 'px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition';
+            
+            document.getElementById('kpi-role-display').innerText = currentRole === 'student' ? 'Student Workstation' : 'Parent Verifier Mode';
+            document.getElementById('role-label-text').innerText = currentRole === 'student' ? 'Mode: Student Workstation' : 'Mode: Parent Supervisor';
+            
+            const btnApprove = document.getElementById('btn-approve-all');
+            if (currentRole === 'parent') {
+                btnApprove.classList.remove('hidden');
+            } else {
+                btnApprove.classList.add('hidden');
+            }
+
+            renderDashboard();
+        }
+
+        function setStudentFilter(std) {
+            currentStudentFilter = std;
+            ['all', 'mk', 'john'].forEach(id => {
+                const btn = document.getElementById(`btn-std-${id}`);
+                btn.className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-850 hover:text-white";
+            });
+
+            if (std === 'ALL') document.getElementById('btn-std-all').className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-lg shadow-indigo-600/10 transition";
+            if (std === 'MaryKathryn') document.getElementById('btn-std-mk').className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-lg shadow-indigo-600/10 transition";
+            if (std === 'John') document.getElementById('btn-std-john').className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium bg-indigo-600 text-white shadow-lg shadow-indigo-600/10 transition";
+
+            renderDashboard();
+        }
+
+        function setDayFilter(dayType) {
+            currentDayFilter = dayType;
+            document.getElementById('btn-day-home').className = dayType === 'HOME' ? "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium bg-slate-800/80 text-emerald-400 border border-emerald-500/20 transition" : "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-850 hover:text-white transition";
+            document.getElementById('btn-day-all').className = dayType === 'ALL' ? "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium bg-slate-800/80 text-indigo-400 border border-indigo-500/20 transition" : "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-850 hover:text-white transition";
+
+            document.getElementById('calendar-view-title').innerText = dayType === 'HOME' ? "Home Office Schedule" : "Full Week Schedule";
+            
+            selectedDayTab = '';
+            renderDashboard();
+        }
+
+        function handleTaskClick(taskId) {
+            const task = allSheetTasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            if (currentRole === 'student') {
+                if (task.status === 'todo') {
+                    task.status = 'pending';
+                } else if (task.status === 'pending') {
+                    task.status = 'todo';
+                }
+            } else if (currentRole === 'parent') {
+                if (task.status === 'pending') {
+                    task.status = 'completed';
+                } else if (task.status === 'completed') {
+                    task.status = 'pending';
+                } else if (task.status === 'todo') {
+                    task.status = 'completed';
+                }
+            }
+
+            renderDashboard();
+
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                google.script.run.updateRowStatus(taskId, task.status);
+            }
+        }
+
+        function approveAllPending() {
+            const activeTasks = weekGroups[activeWeekGroupKey] || [];
+            activeTasks.forEach(t => {
+                if (t.status === 'pending') {
+                    t.status = 'completed';
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run.updateRowStatus(t.id, 'completed');
+                    }
+                }
+            });
+            renderDashboard();
+        }
+
+        function renderDashboard() {
+            const activeWeekTasks = weekGroups[activeWeekGroupKey] || allSheetTasks;
+
+            document.getElementById('week-pill-text').innerText = activeWeekGroupKey || "All Dates";
+            document.getElementById('archive-tab-label').innerText = activeWeekGroupKey || "Dashboard";
+
+            const mkTasks = activeWeekTasks.filter(t => t.student.toLowerCase().includes('mary'));
+            const johnTasks = activeWeekTasks.filter(t => t.student.toLowerCase().includes('john'));
+            document.getElementById('badge-all-count').innerText = activeWeekTasks.length;
+            document.getElementById('badge-mk-count').innerText = mkTasks.length;
+            document.getElementById('badge-john-count').innerText = johnTasks.length;
+
+            const pendingCount = activeWeekTasks.filter(t => t.status === 'pending').length;
+            document.getElementById('pending-count-badge').innerText = `${pendingCount} Pending Approvals`;
+
+            let filteredTasks = activeWeekTasks.filter(t => {
+                if (currentStudentFilter !== 'ALL' && !t.student.toLowerCase().includes(currentStudentFilter.toLowerCase())) return false;
+                if (currentDayFilter === 'HOME' && !t.isHomeDay) return false;
+                return true;
+            });
+
+            const dayGroups = {};
+            filteredTasks.forEach(t => {
+                if (!dayGroups[t.day]) dayGroups[t.day] = [];
+                dayGroups[t.day].push(t);
+            });
+
+            const dayTabsContainer = document.getElementById('day-tabs-container');
+            const daysList = Object.keys(dayGroups);
+            dayTabsContainer.innerHTML = '';
+            
+            if (daysList.length > 0 && (!selectedDayTab || !daysList.includes(selectedDayTab))) {
+                selectedDayTab = daysList[0];
+            }
+
+            daysList.forEach(day => {
+                const isSelected = selectedDayTab === day;
+                const count = dayGroups[day].length;
+                dayTabsContainer.innerHTML += `
+                    <button onclick="selectedDayTab='${day}'; renderDashboard();" class="px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition flex items-center space-x-2 ${isSelected ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-2 ring-indigo-400' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'}">
+                        <span>${day}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-indigo-900 text-indigo-200' : 'bg-slate-800 text-slate-400'}">${count}</span>
+                    </button>
+                `;
+            });
+
+            const gridContainer = document.getElementById('calendar-grid-container');
+            gridContainer.innerHTML = '';
+
+            if (daysList.length === 0 || !selectedDayTab) {
+                gridContainer.innerHTML = `<div class="p-12 bg-slate-900/40 border border-slate-800 rounded-2xl text-center text-xs text-slate-500">No assignments found for selected date/filters.</div>`;
+            } else {
+                const tasksForSelectedDay = dayGroups[selectedDayTab] || [];
+                let cardsHTML = '';
+
+                tasksForSelectedDay.forEach(t => {
+                    let statusBadge = '';
+                    let borderClass = 'border-slate-800 hover:border-slate-700';
+                    let bgClass = 'bg-slate-950/60';
+
+                    if (t.status === 'pending') {
+                        statusBadge = `<span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Pending Verification</span>`;
+                        borderClass = 'border-amber-500/40';
+                        bgClass = 'bg-amber-950/10';
+                    } else if (t.status === 'completed') {
+                        statusBadge = `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Verified Complete</span>`;
+                        borderClass = 'border-emerald-500/30';
+                        bgClass = 'bg-emerald-950/10';
+                    } else {
+                        statusBadge = `<span class="bg-slate-800 text-slate-400 text-[10px] font-mono px-2 py-0.5 rounded-full">To Do</span>`;
+                    }
+
+                    cardsHTML += `
+                        <div onclick="handleTaskClick(${t.id})" class="${bgClass} border ${borderClass} p-4 rounded-xl space-y-2 transition cursor-pointer hover:shadow-lg group">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded ${t.student.toLowerCase().includes('mary') ? 'bg-violet-500/10 text-violet-300 border border-violet-500/20' : 'bg-teal-500/10 text-teal-300 border border-teal-500/20'}">
+                                        ${t.student}
+                                    </span>
+                                    <span class="text-xs font-bold text-slate-300 truncate max-w-[200px]">${t.subject}</span>
+                                </div>
+                                ${statusBadge}
+                            </div>
+                            <h4 class="text-sm font-bold text-white group-hover:text-indigo-300 transition">${t.assignment}</h4>
+                            <p class="text-xs text-slate-400 font-mono">${t.details}</p>
+                            <div class="pt-2 flex justify-end text-[10px] font-mono text-slate-500">
+                                ${currentRole === 'student' ? 'Click to mark pending &rarr;' : 'Click to approve complete &rarr;'}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                gridContainer.innerHTML = `
+                    <div class="bg-slate-900/40 border border-slate-800/80 p-5 rounded-2xl space-y-4">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                            <h4 class="font-bold text-slate-200 text-base flex items-center gap-2">
+                                <i data-lucide="calendar" class="w-4.5 h-4.5 text-indigo-400"></i>
+                                <span>Assignments for ${selectedDayTab}</span>
+                            </h4>
+                            <span class="text-xs font-mono bg-slate-950 text-indigo-400 font-bold px-3 py-1 rounded-lg border border-slate-800">${tasksForSelectedDay.length} Total Work Items</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${cardsHTML}
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderMetrics(activeWeekTasks);
+            lucide.createIcons();
+        }
+
+        function renderMetrics(activeWeekTasks) {
+            const homeTasks = activeWeekTasks.filter(t => t.isHomeDay);
+            const totalHome = homeTasks.length;
+            const verifiedHome = homeTasks.filter(t => t.status === 'completed').length;
+            const pendingHome = homeTasks.filter(t => t.status === 'pending').length;
+            const todoHome = homeTasks.filter(t => t.status === 'todo').length;
+
+            const rateStr = totalHome > 0 ? Math.round((verifiedHome / totalHome) * 100) + '%' : '0%';
+
+            document.getElementById('stat-center-rate').innerText = rateStr;
+            document.getElementById('stat-lbl-verified').innerText = verifiedHome;
+            document.getElementById('stat-lbl-pending').innerText = pendingHome;
+            document.getElementById('stat-lbl-todo').innerText = todoHome;
+
+            const mkTasks = homeTasks.filter(t => t.student.toLowerCase().includes('mary'));
+            const mkDone = mkTasks.filter(t => t.status === 'completed').length;
+            const mkPending = mkTasks.filter(t => t.status === 'pending').length;
+            document.getElementById('kpi-mk-status').innerText = `${mkDone} / ${mkTasks.length} Done`;
+            document.getElementById('kpi-mk-sub').innerText = `${mkPending} Pending Verification`;
+
+            const johnTasks = homeTasks.filter(t => t.student.toLowerCase().includes('john'));
+            const johnDone = johnTasks.filter(t => t.status === 'completed').length;
+            const johnPending = johnTasks.filter(t => t.status === 'pending').length;
+            document.getElementById('kpi-john-status').innerText = `${johnDone} / ${johnTasks.length} Done`;
+            document.getElementById('kpi-john-sub').innerText = `${johnPending} Pending Verification`;
+
+            const ctx = document.getElementById('progressRingChart');
+            if (ctx) {
+                if (ringChartInstance) ringChartInstance.destroy();
+
+                ringChartInstance = new Chart(ctx.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Verified', 'Pending', 'To Do'],
+                        datasets: [{
+                            data: [verifiedHome, pendingHome, todoHome],
+                            backgroundColor: ['#10b981', '#f59e0b', '#334155'],
+                            borderColor: '#0f172a',
+                            borderWidth: 3,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '75%',
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        window.onload = function() {
+            lucide.createIcons();
+            fetchLiveSheetData();
+        };
+    </script>
+</body>
+</html>
