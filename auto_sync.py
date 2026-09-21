@@ -30,27 +30,33 @@ def download_latest_agenda():
         page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
         page.wait_for_timeout(2000)
         
-        print("Filling credentials...")
-        # Hardcoded username
-        user_field = page.locator('#Username, #email, input[name="Username"], input[name="email"], input[type="text"]').first
+        print("Filling hardcoded credentials...")
+        # Fill username
+        user_field = page.locator('#Username, input[name="Username"], input[type="text"]').first
         user_field.wait_for(state="visible", timeout=10000)
+        user_field.click()
         user_field.fill("LisaBostic")
         
-        # Password fetched from GitHub Secrets
+        # Fill hardcoded password
         pass_field = page.locator('#Password, input[name="Password"], input[type="password"]').first
-        pass_field.fill(CLASSREACH_PASS)
+        pass_field.click()
+        pass_field.fill("Donnie53!")
+        page.wait_for_timeout(1000)
         
         # Submit form
         print("Submitting login form...")
         submit_btn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Log In"), input[value*="Log In"]').first
-        submit_btn.click()
+        if submit_btn.is_visible():
+            submit_btn.click()
+        else:
+            pass_field.press("Enter")
             
         page.wait_for_timeout(5000)
         print(f"Post-login URL: {page.url}")
         
         # Verify authentication succeeded
         if "login" in page.url.lower():
-            print("ERROR: Authentication failed. Please check CLASSREACH_PASS in GitHub Secrets.")
+            print("ERROR: Authentication failed with provided credentials.")
             raise Exception("Authentication failed - redirected back to login page.")
 
         # Wait for home dashboard landing page elements
