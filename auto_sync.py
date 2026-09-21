@@ -15,24 +15,36 @@ CLASSREACH_USER = os.getenv("CLASSREACH_USER")
 CLASSREACH_PASS = os.getenv("CLASSREACH_PASS")
 YAHOO_EMAIL = os.getenv("YAHOO_EMAIL")
 YAHOO_APP_PASS = os.getenv("YAHOO_APP_PASS")
-
 # 1. SCRAPE LATEST AGENDA PDF FROM CLASSREACH
 def download_latest_agenda():
     print("Connecting to ClassReach...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
         
-        page.goto("https://app.classreach.com/login")
-        page.fill('input[type="email"]', CLASSREACH_USER)
-        page.fill('input[type="password"]', CLASSREACH_PASS)
-        page.click('button[type="submit"]')
+        # Navigate to login
+        page.goto("https://app.classreach.com/login", wait_until="networkidle")
         
-        page.wait_for_selector('text=Handouts', timeout=20000)
-        page.click('text=Handouts')
+        # Fill credentials
+        email_selector = 'input[type="email"], input[name="email"], input[name="username"], input[placeholder*="Email"]'
+        page.wait_for_selector(email_selector, timeout=20000)
+        page.fill(email_selector, CLASSREACH_USER)
         
+        pass_selector = 'input[type="password"], input[name="password"]'
+        page.fill(pass_selector, CLASSREACH_PASS)
+        page.click('button[type="submit"], input[type="submit"], button:has-text("Log In")')
+        
+        # Wait for home dashboard to render
+        print("Waiting for ClassReach dashboard...")
+        page.wait_for_selector('text=Download Weekly Items', timeout=25000)
+        
+        # Click the "Download Weekly Items" button directly under WEEKLY AGENDA
+        print("Clicking 'Download Weekly Items' button...")
         with page.expect_download() as download_info:
-            page.click('text=TASKS_FOR_WEEK')
+            page.click('text=Download Weekly Items')
         
         download = download_info.value
         pdf_path = "latest_agenda.pdf"
@@ -40,7 +52,6 @@ def download_latest_agenda():
         browser.close()
         print("ClassReach PDF successfully downloaded.")
         return pdf_path
-
 # 2. CHECK YAHOO MAIL FOR TEACHER UPDATE EMAILS
 def fetch_yahoo_updates():
     print("Checking Yahoo Mail for teacher updates...")
