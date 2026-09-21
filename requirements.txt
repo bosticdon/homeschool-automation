@@ -1,0 +1,4 @@
+playwright
+pypdf
+gspread
+google-auth
