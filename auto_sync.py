@@ -13,53 +13,50 @@ sys.stdout.reconfigure(line_buffering=True)
 # CLASSREACH & SHEETS CONFIG
 CLASSREACH_USER = os.getenv("CLASSREACH_USER", "bostic_lisa@yahoo.com")
 CLASSREACH_PASS = os.getenv("CLASSREACH_PASS", "Donnie53!")
-# Map both possible secret variable names
 GOOGLE_SHEETS_JSON = os.getenv("GCP_SERVICE_ACCOUNT_KEY") or os.getenv("GOOGLE_SHEETS_JSON")
 
 # 1. SCRAPE LATEST AGENDA PDF FROM CLASSREACH
 def download_latest_agenda():
-    print("Connecting to Carolina Hybrid ClassReach portal...", flush=True)
+    print("Connecting to Carolina Hybrid ClassReach portal via Firefox...", flush=True)
     with sync_playwright() as p:
-        browser = p.chromium.launch(
+        # Launch Firefox which bypasses Cloudflare Chromium signatures
+        browser = p.firefox.launch(
             headless=True,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-accelerated-2d-canvas",
-                "--no-first-run",
-                "--no-zygote",
-                "--disable-gpu"
-            ]
+            firefox_user_prefs={
+                "dom.webdriver.enabled": False,
+                "useAutomationExtension": False,
+            }
         )
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-            viewport={"width": 1366, "height": 768},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
+            viewport={"width": 1440, "height": 900},
             locale="en-US",
             timezone_id="America/New_York"
         )
         page = context.new_page()
         
-        # Mask automation flags
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-            window.navigator.chrome = { runtime: {} };
-            Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
-            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-        """)
+        # Navigate to login page
+        print("Navigating to portal...", flush=True)
+        page.goto("https://carolinahybrid.classreach.com/Login", wait_until="domcontentloaded")
         
-        page.goto("https://carolinahybrid.classreach.com/Login", wait_until="networkidle")
-        print("Waiting for Cloudflare verification...", flush=True)
-        page.wait_for_timeout(5000)
+        # Allow Cloudflare challenge to evaluate and resolve
+        print("Waiting for Cloudflare verification to complete...", flush=True)
+        page.wait_for_timeout(7000)
 
+        # Locate inputs after Cloudflare bypasses
+        print("Locating credential fields...", flush=True)
+        email_selector = 'input[type="text"], input[type="email"], input[name*="user" i], #Username'
+        page.wait_for_selector(email_selector, timeout=30000)
+        
         print("Filling credentials...", flush=True)
-        page.fill('input[type="text"], input[type="email"], input[name*="user" i]', CLASSREACH_USER)
+        page.fill(email_selector, CLASSREACH_USER)
         page.fill('input[type="password"]', CLASSREACH_PASS)
         page.wait_for_timeout(1000)
         
         print("Clicking Login button...", flush=True)
         page.click('button:has-text("Login"), input[value="Login"], .btn:has-text("Login")')
+        
+        # Wait for authentication redirect
         page.wait_for_timeout(6000)
         print(f"Post-login URL: {page.url}", flush=True)
 
