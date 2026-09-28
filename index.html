@@ -252,43 +252,65 @@
                 });
         }
 
-        function formatDisplayDate(rawDateStr) {
-            if (!rawDateStr || rawDateStr === "Sat/Sun") return rawDateStr || "This Week";
-            
-            // Try parsing ISO strings like 2026-08-17T04:00:00.000Z
-            const parsedDate = new Date(rawDateStr);
-            if (!isNaN(parsedDate.getTime())) {
-                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                return `${days[parsedDate.getUTCDay()]} ${months[parsedDate.getUTCMonth()]} ${parsedDate.getUTCDate()}`;
+        // Helper to parse dates formatted as text, ISO strings, or Sat/Sun
+        function parseDateObject(dateStr) {
+            if (!dateStr || dateStr.toLowerCase().includes("status") || dateStr.toLowerCase().includes("day")) return null;
+            if (dateStr.toLowerCase().includes("sat/sun") || dateStr.toLowerCase().includes("weekend")) return { isWeekend: true, label: "Sat/Sun" };
+
+            // Check if string contains standard ISO date
+            const isoParsed = new Date(dateStr);
+            if (!isNaN(isoParsed.getTime())) {
+                return {
+                    dateObj: isoParsed,
+                    label: formatDateLabel(isoParsed)
+                };
             }
-            return rawDateStr;
+
+            // Fallback for short date strings like "Mon, Sep 28" or "Sep 28"
+            const match = dateStr.match(/([A-Za-z]{3})\s+(\d{1,2})/);
+            if (match) {
+                const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+                const monthIdx = monthNames.indexOf(match[1].toLowerCase());
+                const dayNum = parseInt(match[2], 10);
+                if (monthIdx !== -1 && !isNaN(dayNum)) {
+                    const year = new Date().getFullYear();
+                    const constructedDate = new Date(year, monthIdx, dayNum);
+                    return {
+                        dateObj: constructedDate,
+                        label: formatDateLabel(constructedDate)
+                    };
+                }
+            }
+
+            return { isWeekend: false, label: dateStr };
         }
 
-        function calculateMondayWeekLabel(dateVal, lastKnownWeek) {
-            if (!dateVal || dateVal === "Sat/Sun") return lastKnownWeek || "Week of Current Agenda";
+        function formatDateLabel(dObj) {
+            const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            return `${days[dObj.getUTCDay()]} ${months[dObj.getUTCMonth()]} ${dObj.getUTCDate()}`;
+        }
+
+        function calculateMondayWeekLabel(parsedDateInfo, lastKnownWeek) {
+            if (!parsedDateInfo || !parsedDateInfo.dateObj) return lastKnownWeek || "Week of Current Agenda";
             
             const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            const taskDate = new Date(dateVal);
-            
-            if (isNaN(taskDate.getTime())) return lastKnownWeek || "Week of Current Agenda";
+            const dObj = parsedDateInfo.dateObj;
 
-            const dayOfWeek = taskDate.getUTCDay();
+            const dayOfWeek = dObj.getUTCDay();
             const distanceToMonday = (dayOfWeek === 0) ? -6 : (1 - dayOfWeek);
 
-            const mondayDate = new Date(taskDate);
-            mondayDate.setUTCDate(taskDate.getUTCDate() + distanceToMonday);
+            const mondayDate = new Date(dObj);
+            mondayDate.setUTCDate(dObj.getUTCDate() + distanceToMonday);
 
             return "Week of " + monthNames[mondayDate.getUTCMonth()] + " " + mondayDate.getUTCDate();
         }
 
         function parseSheetJsonToTasks(rows) {
             const tasks = [];
-            const homeDays = ["Mon", "Wed", "Fri", "Monday", "Wednesday", "Friday"];
+            const homeDays = ["mon", "wed", "fri"];
             let runningWeekGroup = "Week of Current Agenda";
 
-            // Array index mapping:
-            // [0] = Status, [1] = Date, [2] = Student, [3] = Subject, [4] = Task Description, [5] = Details
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
                 if (!row || row.length < 5) continue;
@@ -300,8 +322,8 @@
                 const assignment = String(row[4] || "").trim();
                 const details = String(row[5] || "").trim();
 
-                // Skip header row if present
-                if (subject.toLowerCase() === "subject" || assignment.toLowerCase() === "assignment") continue;
+                // Skip repetitive headers
+                if (subject.toLowerCase() === "subject" || assignment.toLowerCase() === "assignment" || rawDate.toLowerCase() === "day") continue;
                 if (!subject && !assignment) continue;
 
                 let status = "todo";
@@ -311,13 +333,18 @@
                     status = "pending";
                 }
 
-                const displayDay = formatDisplayDate(rawDate);
-                const isHomeDay = homeDays.some(hd => displayDay.toLowerCase().includes(hd.toLowerCase()));
-                runningWeekGroup = calculateMondayWeekLabel(rawDate, runningWeekGroup);
+                const dateInfo = parseDateObject(rawDate);
+                const displayLabel = dateInfo ? dateInfo.label : (rawDate || "This Week");
+                
+                if (dateInfo && dateInfo.dateObj) {
+                    runningWeekGroup = calculateMondayWeekLabel(dateInfo, runningWeekGroup);
+                }
+
+                const isHomeDay = homeDays.some(hd => displayLabel.toLowerCase().includes(hd));
 
                 tasks.push({
                     id: i + 1,
-                    day: displayDay,
+                    day: displayLabel,
                     weekGroup: runningWeekGroup,
                     isHomeDay: isHomeDay,
                     student: student || "Everyone",
@@ -347,9 +374,9 @@
                 weekKeys.forEach(wk => {
                     selector.innerHTML += `<option value="${wk}">${wk}</option>`;
                 });
-                if (!activeWeekGroupKey || !weekKeys.includes(activeWeekGroupKey)) {
-                    activeWeekGroupKey = weekKeys[weekKeys.length - 1];
-                }
+                
+                // Select latest week by default
+                activeWeekGroupKey = weekKeys[weekKeys.length - 1];
                 selector.value = activeWeekGroupKey;
             } else {
                 selector.innerHTML = `<option value="">No Dates Detected</option>`;
@@ -433,7 +460,6 @@
                 newStatusText = (task.status === 'completed') ? 'Complete' : 'Pending';
             }
 
-            // Sync state directly with Google Sheets Web App backend
             fetch(WEB_APP_URL, {
                 method: "POST",
                 mode: "no-cors",
