@@ -27,7 +27,7 @@
             <div>
                 <div class="flex items-center space-x-2">
                     <span class="text-xs font-semibold uppercase tracking-widest text-indigo-400 font-mono">Hybrid Homeschool Command</span>
-                    <span class="bg-indigo-500/10 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/20">GITHUB PAGES</span>
+                    <span class="bg-indigo-500/10 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/20">LIVE APPS SCRIPT</span>
                 </div>
                 <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                     Weekly Learning Dashboard
@@ -198,7 +198,6 @@
                                     <span id="calendar-view-title">Schedule</span>
                                 </h3>
 
-                                <!-- PILL BOX SHOWING ACTIVE ARCHIVED WEEK -->
                                 <span id="week-pill-box" class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-mono font-bold text-xs px-3 py-1 rounded-full shadow-md shadow-indigo-500/20 border border-indigo-400/30 flex items-center space-x-1.5">
                                     <i data-lucide="archive" class="w-3.5 h-3.5"></i>
                                     <span id="week-pill-text">Detecting Week...</span>
@@ -210,13 +209,11 @@
                         </div>
                     </div>
 
-                    <!-- DAY TABS FOR CALENDAR NAV -->
                     <div class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 flex-wrap" id="day-tabs-container">
                         <!-- Dynamic Day Pills -->
                     </div>
                 </div>
 
-                <!-- SINGLE DAY CALENDAR CONTAINER -->
                 <div id="calendar-grid-container" class="space-y-4">
                     <div class="text-center py-12 text-slate-500 font-mono text-sm">
                         Loading tasks from Google Sheet...
@@ -228,7 +225,7 @@
 
     <!-- DATA ENGINE CONNECTED DIRECTLY TO GOOGLE APPS SCRIPT WEB APP -->
     <script>
-        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJyLQPTbr65FSDKeGmR3foKnilDvbFqYCuWoRZgADyHue6cRcpsVrh5PGuhLWw3gj4/exec";
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzJyLQPTbr65FSDKeGmR3foKnilDvbFqYCuWoRZgADyHue6cRcpsVrh5PGuhLWw3gj4/exec";
         const PARENT_PIN = "08012004";
 
         let allSheetTasks = [];
@@ -241,7 +238,7 @@
         let ringChartInstance = null;
 
         function fetchLiveSheetData() {
-            fetch(APPS_SCRIPT_URL)
+            fetch(WEB_APP_URL)
                 .then(response => response.json())
                 .then(data => {
                     allSheetTasks = parseSheetJsonToTasks(data);
@@ -251,31 +248,38 @@
                 .catch(err => {
                     console.error("Error fetching data from Apps Script:", err);
                     document.getElementById('calendar-grid-container').innerHTML = 
-                        `<div class="p-12 text-center text-xs text-rose-400">Failed to load data from Google Apps Script Web App. Ensure your script is deployed for 'Anyone'.</div>`;
+                        `<div class="p-12 text-center text-xs text-rose-400">Failed to load data from Google Apps Script Web App.</div>`;
                 });
         }
 
-        function calculateMondayWeekLabel(dayStr, lastKnownWeek) {
-            if (!dayStr) return lastKnownWeek || "Week of Current Agenda";
-            const monthMap = { "jan": 0, "feb": 1, "mar": 2, "apr": 3, "may": 4, "jun": 5, "jul": 6, "aug": 7, "sep": 8, "oct": 9, "nov": 10, "dec": 11 };
-            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        function formatDisplayDate(rawDateStr) {
+            if (!rawDateStr || rawDateStr === "Sat/Sun") return rawDateStr || "This Week";
             
-            const match = dayStr.match(/([A-Za-z]{3})\s+(\d{1,2})/);
-            if (!match) return lastKnownWeek || "Week of Agenda";
+            // Try parsing ISO strings like 2026-08-17T04:00:00.000Z
+            const parsedDate = new Date(rawDateStr);
+            if (!isNaN(parsedDate.getTime())) {
+                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                return `${days[parsedDate.getUTCDay()]} ${months[parsedDate.getUTCMonth()]} ${parsedDate.getUTCDate()}`;
+            }
+            return rawDateStr;
+        }
 
-            const monthStr = match[1].toLowerCase().substring(0, 3);
-            const dayNum = parseInt(match[2], 10);
-            if (isNaN(dayNum) || monthMap[monthStr] === undefined) return lastKnownWeek || "Week of Agenda";
+        function calculateMondayWeekLabel(dateVal, lastKnownWeek) {
+            if (!dateVal || dateVal === "Sat/Sun") return lastKnownWeek || "Week of Current Agenda";
+            
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const taskDate = new Date(dateVal);
+            
+            if (isNaN(taskDate.getTime())) return lastKnownWeek || "Week of Current Agenda";
 
-            const currentYear = new Date().getFullYear();
-            const taskDate = new Date(currentYear, monthMap[monthStr], dayNum);
-            const dayOfWeek = taskDate.getDay();
+            const dayOfWeek = taskDate.getUTCDay();
             const distanceToMonday = (dayOfWeek === 0) ? -6 : (1 - dayOfWeek);
 
             const mondayDate = new Date(taskDate);
-            mondayDate.setDate(taskDate.getDate() + distanceToMonday);
+            mondayDate.setUTCDate(taskDate.getUTCDate() + distanceToMonday);
 
-            return "Week of " + monthNames[mondayDate.getMonth()] + " " + mondayDate.getDate();
+            return "Week of " + monthNames[mondayDate.getUTCMonth()] + " " + mondayDate.getUTCDate();
         }
 
         function parseSheetJsonToTasks(rows) {
@@ -283,18 +287,21 @@
             const homeDays = ["Mon", "Wed", "Fri", "Monday", "Wednesday", "Friday"];
             let runningWeekGroup = "Week of Current Agenda";
 
-            // Expecting headers: Subject, Task Description, Details, Status, Student, Date
-            for (let i = 1; i < rows.length; i++) {
+            // Array index mapping:
+            // [0] = Status, [1] = Date, [2] = Student, [3] = Subject, [4] = Task Description, [5] = Details
+            for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row || row.length < 2) continue;
+                if (!row || row.length < 5) continue;
 
-                const subject = String(row[0] || "").trim();
-                const assignment = String(row[1] || "").trim();
-                const details = String(row[2] || "").trim();
-                const rawStatus = String(row[3] || "").trim().toLowerCase();
-                const student = String(row[4] || "").trim();
-                const dayStr = String(row[5] || "").trim();
+                const rawStatus = String(row[0] || "").trim().toLowerCase();
+                const rawDate = String(row[1] || "").trim();
+                const student = String(row[2] || "").trim();
+                const subject = String(row[3] || "").trim();
+                const assignment = String(row[4] || "").trim();
+                const details = String(row[5] || "").trim();
 
+                // Skip header row if present
+                if (subject.toLowerCase() === "subject" || assignment.toLowerCase() === "assignment") continue;
                 if (!subject && !assignment) continue;
 
                 let status = "todo";
@@ -304,12 +311,13 @@
                     status = "pending";
                 }
 
-                const isHomeDay = homeDays.some(hd => dayStr.toLowerCase().includes(hd.toLowerCase()));
-                runningWeekGroup = calculateMondayWeekLabel(dayStr, runningWeekGroup);
+                const displayDay = formatDisplayDate(rawDate);
+                const isHomeDay = homeDays.some(hd => displayDay.toLowerCase().includes(hd.toLowerCase()));
+                runningWeekGroup = calculateMondayWeekLabel(rawDate, runningWeekGroup);
 
                 tasks.push({
-                    id: i,
-                    day: dayStr || "This Week",
+                    id: i + 1,
+                    day: displayDay,
                     weekGroup: runningWeekGroup,
                     isHomeDay: isHomeDay,
                     student: student || "Everyone",
@@ -426,7 +434,7 @@
             }
 
             // Sync state directly with Google Sheets Web App backend
-            fetch(APPS_SCRIPT_URL, {
+            fetch(WEB_APP_URL, {
                 method: "POST",
                 mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
@@ -445,7 +453,7 @@
             activeTasks.forEach(t => {
                 if (t.status === 'pending') {
                     t.status = 'completed';
-                    fetch(APPS_SCRIPT_URL, {
+                    fetch(WEB_APP_URL, {
                         method: "POST",
                         mode: "no-cors",
                         headers: { "Content-Type": "application/json" },
