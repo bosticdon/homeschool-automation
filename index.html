@@ -226,9 +226,9 @@
         </main>
     </div>
 
-    <!-- DATA ENGINE CONNECTED DIRECTLY TO GOOGLE SHEETS CSV -->
+    <!-- DATA ENGINE CONNECTED DIRECTLY TO GOOGLE APPS SCRIPT WEB APP -->
     <script>
-        const SHEET_ID = "1joCg9NZiCzTPAhiIt-LXiT6UVVnTzL19788BVZ1JqA4";
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJyLQPTbr65FSDKeGmR3foKnilDvbFqYCuWoRZgADyHue6cRcpsVrh5PGuhLWw3gj4/exec";
         const PARENT_PIN = "08012004";
 
         let allSheetTasks = [];
@@ -241,19 +241,17 @@
         let ringChartInstance = null;
 
         function fetchLiveSheetData() {
-            const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Dashboard`;
-            
-            fetch(csvUrl)
-                .then(response => response.text())
-                .then(csvText => {
-                    allSheetTasks = parseCSVToTasks(csvText);
+            fetch(APPS_SCRIPT_URL)
+                .then(response => response.json())
+                .then(data => {
+                    allSheetTasks = parseSheetJsonToTasks(data);
                     groupTasksByWeek();
                     renderDashboard();
                 })
                 .catch(err => {
-                    console.error("Error fetching sheet data:", err);
+                    console.error("Error fetching data from Apps Script:", err);
                     document.getElementById('calendar-grid-container').innerHTML = 
-                        `<div class="p-12 text-center text-xs text-rose-400">Failed to load data from Google Sheet. Ensure your sheet is shared publicly or to 'Anyone with link'.</div>`;
+                        `<div class="p-12 text-center text-xs text-rose-400">Failed to load data from Google Apps Script Web App. Ensure your script is deployed for 'Anyone'.</div>`;
                 });
         }
 
@@ -280,39 +278,44 @@
             return "Week of " + monthNames[mondayDate.getMonth()] + " " + mondayDate.getDate();
         }
 
-        function parseCSVToTasks(csvText) {
-            const lines = csvText.split('\n');
+        function parseSheetJsonToTasks(rows) {
             const tasks = [];
             const homeDays = ["Mon", "Wed", "Fri", "Monday", "Wednesday", "Friday"];
             let runningWeekGroup = "Week of Current Agenda";
 
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
+            // Expecting headers: Subject, Task Description, Details, Status, Student, Date
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length < 2) continue;
 
-                // Regex CSV line parser
-                const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-                const clean = row.map(col => col.replace(/^"|"$/g, '').trim());
+                const subject = String(row[0] || "").trim();
+                const assignment = String(row[1] || "").trim();
+                const details = String(row[2] || "").trim();
+                const rawStatus = String(row[3] || "").trim().toLowerCase();
+                const student = String(row[4] || "").trim();
+                const dayStr = String(row[5] || "").trim();
 
-                if (clean.length < 5) continue;
+                if (!subject && !assignment) continue;
 
-                const rawVal = String(clean[0]).toUpperCase();
                 let status = "todo";
-                if (rawVal === "TRUE") status = "completed";
-                else if (rawVal === "PENDING") status = "pending";
+                if (rawStatus === "true" || rawStatus === "complete" || rawStatus === "completed") {
+                    status = "completed";
+                } else if (rawStatus === "pending") {
+                    status = "pending";
+                }
 
-                const dayStr = clean[1] || "";
                 const isHomeDay = homeDays.some(hd => dayStr.toLowerCase().includes(hd.toLowerCase()));
                 runningWeekGroup = calculateMondayWeekLabel(dayStr, runningWeekGroup);
 
                 tasks.push({
-                    id: i + 1,
-                    day: dayStr,
+                    id: i,
+                    day: dayStr || "This Week",
                     weekGroup: runningWeekGroup,
                     isHomeDay: isHomeDay,
-                    student: clean[2] || "",
-                    subject: clean[3] || "",
-                    assignment: clean[4] || "",
-                    details: clean[5] || "",
+                    student: student || "Everyone",
+                    subject: subject || "General",
+                    assignment: assignment,
+                    details: details,
                     status: status
                 });
             }
@@ -413,11 +416,26 @@
             const task = allSheetTasks.find(t => t.id === taskId);
             if (!task) return;
 
+            let newStatusText = "Pending";
             if (currentRole === 'student') {
                 task.status = (task.status === 'todo') ? 'pending' : 'todo';
+                newStatusText = (task.status === 'pending') ? 'Pending' : 'Pending';
             } else if (currentRole === 'parent') {
                 task.status = (task.status === 'completed') ? 'pending' : 'completed';
+                newStatusText = (task.status === 'completed') ? 'Complete' : 'Pending';
             }
+
+            // Sync state directly with Google Sheets Web App backend
+            fetch(APPS_SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    subject: task.subject,
+                    task: task.assignment,
+                    status: newStatusText
+                })
+            }).catch(err => console.error("Error saving status update:", err));
 
             renderDashboard();
         }
@@ -425,7 +443,19 @@
         function approveAllPending() {
             const activeTasks = weekGroups[activeWeekGroupKey] || [];
             activeTasks.forEach(t => {
-                if (t.status === 'pending') t.status = 'completed';
+                if (t.status === 'pending') {
+                    t.status = 'completed';
+                    fetch(APPS_SCRIPT_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            subject: t.subject,
+                            task: t.assignment,
+                            status: "Complete"
+                        })
+                    }).catch(err => console.error("Error approving task:", err));
+                }
             });
             renderDashboard();
         }
