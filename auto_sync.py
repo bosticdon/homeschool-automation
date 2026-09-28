@@ -106,14 +106,16 @@ def parse_agenda_pdf(pdf_path):
                     extracted_tasks.append({
                         "Subject": current_subject,
                         "Task": line_str,
-                        "Page": page_num
+                        "Details": f"Extracted from PDF Page {page_num}",
+                        "Student": "Everyone",
+                        "Date": "This Week"
                     })
                     
     print(f"Successfully extracted {len(extracted_tasks)} agenda items.", flush=True)
     return extracted_tasks
 
 
-# 3. UPDATE GOOGLE SHEETS DASHBOARD (PRESERVING COMPLETION STATUS)
+# 3. UPDATE GOOGLE SHEETS DASHBOARD (PRESERVING COMPLETION STATUS & MATCHING 6 COLUMNS)
 def update_google_sheets(tasks):
     if not GOOGLE_SHEETS_JSON:
         print("Warning: Neither GCP_SERVICE_ACCOUNT_KEY nor GOOGLE_SHEETS_JSON set. Skipping Sheets update.", flush=True)
@@ -142,19 +144,21 @@ def update_google_sheets(tasks):
         if subject and task_desc:
             status_map[(subject, task_desc)] = status
 
-    # Rebuild headers
-    headers = ["Subject", "Task Description", "Page Reference", "Status"]
+    # Rebuild headers to match 6-column dashboard format
+    headers = ["Subject", "Task Description", "Details", "Status", "Student", "Date"]
     
     # Build updated rows maintaining existing completion statuses
     rows_to_write = []
     for task in tasks:
         subj = task["Subject"]
         desc = task["Task"]
-        page_ref = task["Page"]
+        details = task.get("Details", "")
+        student = task.get("Student", "Everyone")
+        date_val = task.get("Date", "This Week")
         
         # Keep old status if it exists (e.g. "Complete"), otherwise default to "Pending"
         saved_status = status_map.get((subj, desc), "Pending")
-        rows_to_write.append([subj, desc, page_ref, saved_status])
+        rows_to_write.append([subj, desc, details, saved_status, student, date_val])
         
     # Write back without clearing status selections
     sheet.clear()
@@ -162,10 +166,11 @@ def update_google_sheets(tasks):
     if rows_to_write:
         sheet.append_rows(rows_to_write)
         
-    print("Google Sheets dashboard updated without overwriting completion checks!", flush=True)
+    print("Google Sheets dashboard updated cleanly without overwriting completion checks!", flush=True)
     
     if os.path.exists("credentials.json"):
         os.remove("credentials.json")
+
 
 # MAIN EXECUTION FLOW
 if __name__ == "__main__":
