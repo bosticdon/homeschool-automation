@@ -453,13 +453,26 @@
 
             let newStatusText = "Pending";
             if (currentRole === 'student') {
-                task.status = (task.status === 'todo') ? 'pending' : 'todo';
-                newStatusText = (task.status === 'pending') ? 'Pending' : 'Pending';
+                if (task.status === 'todo') {
+                    task.status = 'pending';
+                    newStatusText = 'Pending';
+                } else {
+                    task.status = 'todo';
+                    newStatusText = 'FALSE';
+                }
             } else if (currentRole === 'parent') {
-                task.status = (task.status === 'completed') ? 'pending' : 'completed';
-                newStatusText = (task.status === 'completed') ? 'Complete' : 'Pending';
+                if (task.status === 'completed') {
+                    task.status = 'todo';
+                    newStatusText = 'FALSE';
+                } else {
+                    task.status = 'completed';
+                    newStatusText = 'TRUE';
+                }
             }
 
+            renderDashboard();
+
+            // Send payload to update Column A in Google Sheets
             fetch(WEB_APP_URL, {
                 method: "POST",
                 mode: "no-cors",
@@ -470,8 +483,6 @@
                     status: newStatusText
                 })
             }).catch(err => console.error("Error saving status update:", err));
-
-            renderDashboard();
         }
 
         function approveAllPending() {
@@ -486,7 +497,7 @@
                         body: JSON.stringify({
                             subject: t.subject,
                             task: t.assignment,
-                            status: "Complete"
+                            status: "TRUE"
                         })
                     }).catch(err => console.error("Error approving task:", err));
                 }
